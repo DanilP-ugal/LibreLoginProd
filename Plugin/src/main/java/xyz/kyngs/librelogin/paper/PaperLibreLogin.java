@@ -195,7 +195,6 @@ public class PaperLibreLogin extends AuthenticLibreLogin<Player, World> {
             }
 
             var finalLocation = location;
-            System.out.println("#");
             PaperUtil.runSyncAndWait(() -> player.teleportAsync(finalLocation), this);
 
         } catch (EventCancelledException ignored) {
