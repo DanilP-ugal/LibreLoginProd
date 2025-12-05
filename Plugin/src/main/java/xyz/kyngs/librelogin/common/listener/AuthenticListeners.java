@@ -32,6 +32,9 @@ public class AuthenticListeners<Plugin extends AuthenticLibreLogin<P, S>, P, S> 
     @SuppressWarnings("RegExpSimplifiable") // I don't believe you
     private static final Pattern NAME_PATTERN = Pattern.compile("[a-zA-Z0-9_]*");
 
+    // Floodgate (Bedrock) names may include dots; allow them only for Floodgate players
+    private static final Pattern FLOODGATE_NAME_PATTERN = Pattern.compile("[a-zA-Z0-9_.]*");
+
     protected final Plugin plugin;
     protected final PlatformHandle<P, S> platformHandle;
 
@@ -107,14 +110,17 @@ public class AuthenticListeners<Plugin extends AuthenticLibreLogin<P, S>, P, S> 
     }
 
     protected PreLoginResult onPreLogin(String username, InetAddress address) {
-        if (username.length() > 16 || !NAME_PATTERN.matcher(username).matches()) {
+        boolean floodgate = plugin.floodgateEnabled() && plugin.fromFloodgate(username);
+        var namePattern = floodgate ? FLOODGATE_NAME_PATTERN : NAME_PATTERN;
+
+        if (username.length() > 16 || !namePattern.matcher(username).matches()) {
             return new PreLoginResult(
                     PreLoginState.DENIED,
                     plugin.getMessages().getMessage("kick-illegal-username"),
                     null);
         }
 
-        if (plugin.floodgateEnabled() && plugin.fromFloodgate(username)) {
+        if (floodgate) {
             User user;
             try {
                 user = checkAndValidateByName(username, null, true, address);
