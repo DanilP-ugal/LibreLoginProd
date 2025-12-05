@@ -20,7 +20,6 @@ import com.github.retrooper.packetevents.wrapper.login.client.WrapperLoginClient
 import com.github.retrooper.packetevents.wrapper.login.server.WrapperLoginServerDisconnect;
 import com.github.retrooper.packetevents.wrapper.login.server.WrapperLoginServerEncryptionRequest;
 import io.github.retrooper.packetevents.util.SpigotReflectionUtil;
-import io.papermc.paper.event.player.AsyncPlayerSpawnLocationEvent;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.net.*;
@@ -43,6 +42,7 @@ import org.bukkit.event.player.AsyncPlayerPreLoginEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerLoginEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.spigotmc.event.player.PlayerSpawnLocationEvent;
 import xyz.kyngs.librelogin.api.database.User;
 import xyz.kyngs.librelogin.common.AuthenticLibreLogin;
 import xyz.kyngs.librelogin.common.config.ConfigurationKeys;
@@ -96,8 +96,8 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
 
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
-        // checking is done here instead of in AsyncPlayerSpawnLocationEvent's handler
-        // cuz there is no (Player) object available in that event
+        // checking is done here instead of in PlayerSpawnLocationEvent's handler
+        // to ensure cleanup runs even if spawn handling is skipped
         var player = event.getPlayer();
         if (player.getHealth() == 0) {
             player.setHealth(player.getMaxHealth());
@@ -139,29 +139,21 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
         readOnlyUserCache.put(user.getUuid(), user);
     }
 
-    // Changed to an async variant of this event
-    // cuz the previous one is deprecated and causes a bug (Issue #52)
     @EventHandler(priority = EventPriority.HIGHEST)
-    public void chooseWorld(AsyncPlayerSpawnLocationEvent event) {
-        var puuid = event.getConnection().getProfile().getId();
+    public void chooseWorld(PlayerSpawnLocationEvent event) {
+        var player = event.getPlayer();
+        var puuid = player.getUniqueId();
 
         var ip = ipCache.getIfPresent(puuid);
         if (ip == null) {
-            Bukkit.getScheduler()
-                    .runTask(
-                            plugin.getBootstrap(),
-                            () ->
-                                    Bukkit.getPlayer(puuid)
-                                            .kick(
-                                                    Component.text(
-                                                            "Internal error, please try again"
-                                                                    + " later.")));
+            player.kick(Component.text("Internal error, please try again later."));
             return;
         }
 
         var floodgate = plugin.floodgateEnabled() && plugin.fromFloodgate(puuid);
 
         var originalSpawn = event.getSpawnLocation();
+        var isNewPlayer = !player.hasPlayedBefore();
 
         ipCache.invalidate(puuid);
 
@@ -174,21 +166,12 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
 
         var world = chooseServer(puuid, ip, readOnlyUserCache.getIfPresent(puuid));
         if (world.value() == null) {
-            Bukkit.getScheduler()
-                    .runTask(
-                            plugin.getBootstrap(),
-                            () ->
-                                    Bukkit.getPlayer(puuid)
-                                            .kick(
-                                                    plugin.getMessages()
-                                                            .getMessage(
-                                                                    "kick-no-"
-                                                                            + (world.key()
-                                                                                    ? "lobby"
-                                                                                    : "limbo"))));
+            player.kick(
+                    plugin.getMessages()
+                            .getMessage("kick-no-" + (world.key() ? "lobby" : "limbo")));
         } else {
             // This is terrible, but should work
-            if (!event.isNewPlayer()
+            if (!isNewPlayer
                     && !plugin.getConfiguration()
                             .get(ConfigurationKeys.LIMBO)
                             .contains(event.getSpawnLocation().getWorld().getName())) {
