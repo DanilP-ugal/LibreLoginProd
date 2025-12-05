@@ -113,7 +113,7 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
     @EventHandler(priority = EventPriority.LOWEST)
     public void onJoin(PlayerJoinEvent event) {
         var data = readOnlyUserCache.getIfPresent(event.getPlayer().getUniqueId());
-        if (data == null && !plugin.fromFloodgate(event.getPlayer().getName())) {
+        if (data == null) {
             event.getPlayer().kick(Component.text("Internal error, please try again later."));
             return;
         }
@@ -123,8 +123,6 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
 
     @EventHandler(priority = EventPriority.LOWEST)
     public void onPreLogin(AsyncPlayerPreLoginEvent event) {
-        if (plugin.fromFloodgate(event.getName())) return;
-
         var user = plugin.getDatabaseProvider().getByName(event.getName());
 
         var newProfile = Bukkit.createProfileExact(user.getUuid(), event.getName());
@@ -260,13 +258,6 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
                 return;
             }
 
-            if (plugin.fromFloodgate(username)) {
-                // Floodgate player, do not handle, only retransmit the packet. The UUID will be set
-                // by Floodgate
-                receiveFakeStartPacket(
-                        username, clientKey.orElse(null), event.getChannel(), UUID.randomUUID());
-                return;
-            }
             var preLoginResult = onPreLogin(username, user.getAddress().getAddress());
             switch (preLoginResult.state()) {
                 case DENIED -> {

@@ -43,7 +43,6 @@ public class AuthenticListeners<Plugin extends AuthenticLibreLogin<P, S>, P, S> 
     protected void onPostLogin(P player, User user) {
         var ip = platformHandle.getIP(player);
         var uuid = platformHandle.getUUIDForPlayer(player);
-        if (plugin.fromFloodgate(uuid)) return;
 
         if (user == null) {
             user = plugin.getDatabaseProvider().getByUUID(uuid);
@@ -365,20 +364,19 @@ public class AuthenticListeners<Plugin extends AuthenticLibreLogin<P, S>, P, S> 
 
     protected BiHolder<Boolean, S> chooseServer(
             UUID uuid, @NotNull String ip, @Nullable User user) {
-        var fromFloodgate = plugin.fromFloodgate(uuid);
-
         var sessionTime =
                 Duration.ofSeconds(
                         plugin.getConfiguration().get(ConfigurationKeys.SESSION_TIMEOUT));
 
-        if (fromFloodgate) {
-            user = null;
-        } else if (user == null) {
+        if (user == null) {
             user = plugin.getDatabaseProvider().getByUUID(uuid);
         }
 
-        if (fromFloodgate
-                || user.autoLoginEnabled()
+        if (user == null) {
+            return new BiHolder<>(false, plugin.getServerHandler().chooseLimboServer(null, null));
+        }
+
+        if (user.autoLoginEnabled()
                 || (sessionTime != null
                         && user.getLastAuthentication() != null
                         && ip.equals(user.getIp())
