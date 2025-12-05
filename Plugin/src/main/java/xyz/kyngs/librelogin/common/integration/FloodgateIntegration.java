@@ -9,6 +9,7 @@ package xyz.kyngs.librelogin.common.integration;
 import java.util.UUID;
 import org.geysermc.floodgate.api.FloodgateApi;
 import org.geysermc.floodgate.api.player.FloodgatePlayer;
+import org.jetbrains.annotations.Nullable;
 
 public class FloodgateIntegration {
 
@@ -20,6 +21,17 @@ public class FloodgateIntegration {
 
     public boolean isFloodgateId(UUID uuid) {
         return api.isFloodgatePlayer(uuid);
+    }
+
+    @Nullable
+    public UUID getUUID(String username) {
+        var player = getPlayer(username);
+
+        if (player == null) {
+            return null;
+        }
+
+        return player.getCorrectUniqueId();
     }
 
     public FloodgatePlayer getPlayer(String username) {

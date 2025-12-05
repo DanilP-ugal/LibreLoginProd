@@ -125,6 +125,13 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
     public void onPreLogin(AsyncPlayerPreLoginEvent event) {
         var user = plugin.getDatabaseProvider().getByName(event.getName());
 
+        if (user == null) {
+            event.disallow(
+                    AsyncPlayerPreLoginEvent.Result.KICK_OTHER,
+                    "Internal error, please try again later.");
+            return;
+        }
+
         var newProfile = Bukkit.createProfileExact(user.getUuid(), event.getName());
 
         event.setPlayerProfile(newProfile);
@@ -298,11 +305,12 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
                     // The original event has been cancelled, so we need to send a fake start
                     // packet. It should be safe to set a random UUID as it will be replaced by the
                     // real one later
+                    var offlineUUID =
+                            preLoginResult.user() != null
+                                    ? preLoginResult.user().getUuid()
+                                    : UUID.randomUUID();
                     receiveFakeStartPacket(
-                            username,
-                            clientKey.orElse(null),
-                            event.getChannel(),
-                            UUID.randomUUID());
+                            username, clientKey.orElse(null), event.getChannel(), offlineUUID);
                 }
             }
         } else {

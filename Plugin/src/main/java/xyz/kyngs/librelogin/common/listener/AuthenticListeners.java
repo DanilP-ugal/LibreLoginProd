@@ -123,7 +123,9 @@ public class AuthenticListeners<Plugin extends AuthenticLibreLogin<P, S>, P, S> 
         if (floodgate) {
             User user;
             try {
-                user = checkAndValidateByName(username, null, true, address);
+                user =
+                        checkAndValidateByName(
+                                username, null, true, address, plugin.getFloodgateUUID(username));
             } catch (InvalidCommandArgument e) {
                 return new PreLoginResult(PreLoginState.DENIED, e.getUserFuckUp(), null);
             }
@@ -158,7 +160,7 @@ public class AuthenticListeners<Plugin extends AuthenticLibreLogin<P, S>, P, S> 
             // this user to be premium.
             User user;
             try {
-                user = checkAndValidateByName(username, null, true, address);
+                user = checkAndValidateByName(username, null, true, address, null);
             } catch (InvalidCommandArgument e) {
                 return new PreLoginResult(PreLoginState.DENIED, e.getUserFuckUp(), null);
             }
@@ -179,7 +181,7 @@ public class AuthenticListeners<Plugin extends AuthenticLibreLogin<P, S>, P, S> 
             if (user == null) {
                 User userByName;
                 try {
-                    userByName = checkAndValidateByName(username, mojangData, true, address);
+                    userByName = checkAndValidateByName(username, mojangData, true, address, null);
                 } catch (InvalidCommandArgument e) {
                     return new PreLoginResult(PreLoginState.DENIED, e.getUserFuckUp(), null);
                 }
@@ -191,7 +193,7 @@ public class AuthenticListeners<Plugin extends AuthenticLibreLogin<P, S>, P, S> 
             } else {
                 User byName;
                 try {
-                    byName = checkAndValidateByName(username, mojangData, false, address);
+                    byName = checkAndValidateByName(username, mojangData, false, address, null);
                 } catch (InvalidCommandArgument e) {
                     return new PreLoginResult(PreLoginState.DENIED, e.getUserFuckUp(), null);
                 }
@@ -260,12 +262,46 @@ public class AuthenticListeners<Plugin extends AuthenticLibreLogin<P, S>, P, S> 
      *     issues.
      */
     private User checkAndValidateByName(
-            String username, @Nullable PremiumUser premiumUser, boolean generate, InetAddress ip)
+            String username,
+            @Nullable PremiumUser premiumUser,
+            boolean generate,
+            InetAddress ip,
+            @Nullable UUID forcedUUID)
             throws InvalidCommandArgument {
         // Get the user by the name not case-sensitively
         var user = plugin.getDatabaseProvider().getByName(username);
 
         if (user != null) {
+            if (forcedUUID != null && !user.getUuid().equals(forcedUUID)) {
+                var originalUser = user;
+                var conflictingUser = plugin.getDatabaseProvider().getByUUID(forcedUUID);
+
+                if (conflictingUser != null && !conflictingUser.equals(user)) {
+                    throw new InvalidCommandArgument(
+                            plugin.getMessages()
+                                    .getMessage(
+                                            "kick-occupied-username",
+                                            "%username%",
+                                            conflictingUser.getLastNickname()));
+                }
+
+                user =
+                        new AuthenticUser(
+                                forcedUUID,
+                                user.getPremiumUUID(),
+                                user.getHashedPassword(),
+                                user.getLastNickname(),
+                                user.getJoinDate(),
+                                user.getLastSeen(),
+                                user.getSecret(),
+                                user.getIp(),
+                                user.getLastAuthentication(),
+                                user.getLastServer(),
+                                user.getEmail());
+
+                plugin.getDatabaseProvider().deleteUser(originalUser);
+                plugin.getDatabaseProvider().insertUser(user);
+            }
             // Check for casing mismatch
             if (!user.getLastNickname().contentEquals(username)) {
                 throw new InvalidCommandArgument(
@@ -305,8 +341,10 @@ public class AuthenticListeners<Plugin extends AuthenticLibreLogin<P, S>, P, S> 
             }
 
             var newID =
-                    plugin.generateNewUUID(
-                            username, premiumUser == null ? null : premiumUser.uuid());
+                    forcedUUID != null
+                            ? forcedUUID
+                            : plugin.generateNewUUID(
+                                    username, premiumUser == null ? null : premiumUser.uuid());
 
             var conflictingUser = plugin.getDatabaseProvider().getByUUID(newID);
 
