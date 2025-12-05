@@ -50,50 +50,57 @@ public class AuthenticListeners<Plugin extends AuthenticLibreLogin<P, S>, P, S> 
         if (user == null) {
             user = plugin.getDatabaseProvider().getByUUID(uuid);
         }
+
+        var floodgate = plugin.floodgateEnabled() && plugin.fromFloodgate(uuid);
+
         var sessionTime =
                 Duration.ofSeconds(
                         plugin.getConfiguration().get(ConfigurationKeys.SESSION_TIMEOUT));
 
-        if (user.autoLoginEnabled()) {
-            plugin.delay(
-                    () ->
-                            plugin.getPlatformHandle()
-                                    .getAudienceForPlayer(player)
-                                    .sendMessage(
-                                            plugin.getMessages()
-                                                    .getMessage("info-premium-logged-in")),
-                    500);
-            plugin.getEventProvider()
-                    .fire(
-                            plugin.getEventTypes().authenticated,
-                            new AuthenticAuthenticatedEvent<>(
-                                    user,
-                                    player,
-                                    plugin,
-                                    AuthenticatedEvent.AuthenticationReason.PREMIUM));
-        } else if (sessionTime != null
-                && user.getLastAuthentication() != null
-                && ip.equals(user.getIp())
-                && user.getLastAuthentication()
-                        .toLocalDateTime()
-                        .plus(sessionTime)
-                        .isAfter(LocalDateTime.now())) {
-            plugin.delay(
-                    () ->
-                            plugin.getPlatformHandle()
-                                    .getAudienceForPlayer(player)
-                                    .sendMessage(
-                                            plugin.getMessages()
-                                                    .getMessage("info-session-logged-in")),
-                    500);
-            plugin.getEventProvider()
-                    .fire(
-                            plugin.getEventTypes().authenticated,
-                            new AuthenticAuthenticatedEvent<>(
-                                    user,
-                                    player,
-                                    plugin,
-                                    AuthenticatedEvent.AuthenticationReason.SESSION));
+        if (!floodgate) {
+            if (user.autoLoginEnabled()) {
+                plugin.delay(
+                        () ->
+                                plugin.getPlatformHandle()
+                                        .getAudienceForPlayer(player)
+                                        .sendMessage(
+                                                plugin.getMessages()
+                                                        .getMessage("info-premium-logged-in")),
+                        500);
+                plugin.getEventProvider()
+                        .fire(
+                                plugin.getEventTypes().authenticated,
+                                new AuthenticAuthenticatedEvent<>(
+                                        user,
+                                        player,
+                                        plugin,
+                                        AuthenticatedEvent.AuthenticationReason.PREMIUM));
+            } else if (sessionTime != null
+                    && user.getLastAuthentication() != null
+                    && ip.equals(user.getIp())
+                    && user.getLastAuthentication()
+                            .toLocalDateTime()
+                            .plus(sessionTime)
+                            .isAfter(LocalDateTime.now())) {
+                plugin.delay(
+                        () ->
+                                plugin.getPlatformHandle()
+                                        .getAudienceForPlayer(player)
+                                        .sendMessage(
+                                                plugin.getMessages()
+                                                        .getMessage("info-session-logged-in")),
+                        500);
+                plugin.getEventProvider()
+                        .fire(
+                                plugin.getEventTypes().authenticated,
+                                new AuthenticAuthenticatedEvent<>(
+                                        user,
+                                        player,
+                                        plugin,
+                                        AuthenticatedEvent.AuthenticationReason.SESSION));
+            } else {
+                plugin.getAuthorizationProvider().startTracking(user, player);
+            }
         } else {
             plugin.getAuthorizationProvider().startTracking(user, player);
         }
@@ -423,12 +430,24 @@ public class AuthenticListeners<Plugin extends AuthenticLibreLogin<P, S>, P, S> 
                 Duration.ofSeconds(
                         plugin.getConfiguration().get(ConfigurationKeys.SESSION_TIMEOUT));
 
+        var floodgate = plugin.floodgateEnabled() && plugin.fromFloodgate(uuid);
+
         if (user == null) {
             user = plugin.getDatabaseProvider().getByUUID(uuid);
         }
 
         if (user == null) {
+            if (floodgate) {
+                return new BiHolder<>(
+                        true, plugin.getServerHandler().chooseLobbyServer(null, null, true, false));
+            }
+
             return new BiHolder<>(false, plugin.getServerHandler().chooseLimboServer(null, null));
+        }
+
+        if (floodgate) {
+            return new BiHolder<>(
+                    true, plugin.getServerHandler().chooseLobbyServer(user, null, true, false));
         }
 
         if (user.autoLoginEnabled()
