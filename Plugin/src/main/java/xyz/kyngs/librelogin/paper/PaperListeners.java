@@ -159,9 +159,20 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
             return;
         }
 
-        var world = chooseServer(puuid, ip, readOnlyUserCache.getIfPresent(puuid));
+        var floodgate = plugin.floodgateEnabled() && plugin.fromFloodgate(puuid);
+
+        var originalSpawn = event.getSpawnLocation();
+
         ipCache.invalidate(puuid);
+
+        if (floodgate) {
+            spawnLocationCache.put(puuid, originalSpawn);
+            return;
+        }
+
         spawnLocationCache.invalidate(puuid);
+
+        var world = chooseServer(puuid, ip, readOnlyUserCache.getIfPresent(puuid));
         if (world.value() == null) {
             Bukkit.getScheduler()
                     .runTask(

@@ -216,6 +216,10 @@ public class AuthenticAuthorizationProvider<P, S> extends AuthenticHandler<P, S>
     public void beginTwoFactorAuth(User user, P player, TOTPData data) {
         awaiting2FA.put(player, data.secret());
 
+        if (plugin.floodgateEnabled() && plugin.fromFloodgate(platformHandle.getUUIDForPlayer(player))) {
+            return;
+        }
+
         var limbo = plugin.getServerHandler().chooseLimboServer(user, player);
 
         if (limbo == null) {
