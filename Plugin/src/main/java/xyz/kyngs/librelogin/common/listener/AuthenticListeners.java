@@ -114,6 +114,17 @@ public class AuthenticListeners<Plugin extends AuthenticLibreLogin<P, S>, P, S> 
                     null);
         }
 
+        if (plugin.floodgateEnabled() && plugin.fromFloodgate(username)) {
+            User user;
+            try {
+                user = checkAndValidateByName(username, null, true, address);
+            } catch (InvalidCommandArgument e) {
+                return new PreLoginResult(PreLoginState.DENIED, e.getUserFuckUp(), null);
+            }
+
+            return new PreLoginResult(PreLoginState.FORCE_OFFLINE, null, user);
+        }
+
         PremiumUser mojangData;
 
         try {
