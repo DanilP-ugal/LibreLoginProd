@@ -929,6 +929,15 @@ public abstract class AuthenticLibreLogin<P, S> implements LibreLoginPlugin<P, S
         return luckpermsApi != null;
     }
 
+    @Nullable
+    public UUID getFloodgateUUID(String username) {
+        if (floodgateApi == null) {
+            return null;
+        }
+
+        return floodgateApi.getUUID(username);
+    }
+
     public boolean fromFloodgate(UUID uuid) {
         return floodgateApi != null && uuid != null && floodgateApi.isFloodgateId(uuid);
     }
